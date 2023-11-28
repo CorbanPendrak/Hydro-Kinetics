@@ -1,0 +1,65 @@
+#define IN1 9
+#define IN2 8
+#define IN3 7
+#define IN4 6
+#define ENA 10
+#define ENB 5
+ 
+void motorAccel()
+{
+  for (int i = 0; i < 256; i++) {
+    analogWrite(ENA, i);
+    analogWrite(ENB, i);
+    delay(1);
+  }
+}
+ 
+void motorDecel() 
+{
+  for (int i = 255; i >= 0; --i) {
+    analogWrite(ENA, i);
+    analogWrite(ENB, i);
+    delay(1);
+  }
+}
+ 
+void setup() {
+ 
+  // Set motor connections as outputs
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+ 
+  // Start with motors off
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+ 
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+}
+ 
+void loop() 
+{
+ 
+  // Set motors forward
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+ 
+  // Accelerate & decelerate both motors forward
+  analogWrite(ENA, 255);
+  analogWrite(ENB, 255);
+  motorAccel();
+  delay(5000);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+  motorDecel();
+ 
+  delay(5000);
+}
