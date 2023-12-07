@@ -2,34 +2,46 @@
   File: two_way_communication_2.ino
   Author: Corban Pendrak
   Purpose: Provide two way communciation for ESP32 boards
-  Date Last Modified: 11/26/2023
+  Date Last Modified: 11/30/2023
 */
 
 #include <esp_now.h>
 #include <WiFi.h>
+#include "uRTCLib.h"
 
 // Replace with the MAC Address of your receiver 
 uint8_t broadcastAddress[] = {0x70, 0xb8, 0xf6, 0x5d, 0x7b, 0xb0};
 
+esp_now_peer_info_t peerInfo;
+
 // Self-gathered data
 float temp;
 float hum;
+long current_time;
 
 // Incoming data
 float sender_temperature;
 float sender_humidity;
+long sender_time;
 
 // Stores whether sending data was successful
 String success;
 
-//Must match the receiver structure
+// Must match the receiver structure
 typedef struct struct_message {
     float temp;
     float hum;
+    long current_time;
 } struct_message;
 
-struct_message DHT_Readings;
-struct_message sender_Readings;
+// Create struct_message to hold this board's data to send
+struct_message this_readings;
+
+// Create struct_message to hold other board's data
+struct_message sender_readings;
+
+// uRTCLib rtc;
+uRTCLib rtc(0x68);
 
 /* 
   Input/Output functions
@@ -38,23 +50,30 @@ struct_message sender_Readings;
 
 // Program input: hardcoded values
 void getReadings(){
+  
   hum = 8;
   temp = 5;
+
   if (isnan(hum) || isnan(temp)  ){
-    Serial.println("Failed to read from DHT sensor!");
+    Serial.println("Failed to read from sensor!");
     return;
   }
+
+  current_time = rtc.hour() * 10000 + rtc.minute() * 100 + rtc.second();
+
 }
 
 // Program output: Serial Monitor 
 void display_data(){
   Serial.println("INCOMING READINGS");
   Serial.print("Temperature: ");
-  Serial.print(sender_Readings.temp);
+  Serial.print(sender_readings.temp);
   Serial.println(" ºC");
   Serial.print("Humidity: ");
-  Serial.print(sender_Readings.hum);
+  Serial.print(sender_readings.hum);
   Serial.println(" %");
+  Serial.print("Time: ");
+  Serial.print(sender_readings.current_time);
   Serial.println();
 }
 
@@ -77,11 +96,12 @@ void data_sent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 
 // Callback when data is received
 void data_receive(const uint8_t * mac, const uint8_t *incomingData, int len) {
-  memcpy(&sender_Readings, incomingData, sizeof(sender_Readings));
+  memcpy(&sender_readings, incomingData, sizeof(sender_readings));
   Serial.print("Bytes received: ");
   Serial.println(len);
-  sender_temperature = sender_Readings.temp;
-  sender_humidity = sender_Readings.hum;
+  sender_temperature = sender_readings.temp;
+  sender_humidity = sender_readings.hum;
+  sender_time = sender_readings.current_time;
 }
 
 /*
@@ -91,8 +111,12 @@ void data_receive(const uint8_t * mac, const uint8_t *incomingData, int len) {
  
 // Run once to setup the board
 void setup() {
-  // Start Serial Monitor
+  // Start Serial Monitor and pause to connect
   Serial.begin(115200);
+  delay(3000);
+
+  // Setup date and time
+  URTCLIB_WIRE.begin();
   
   // Set device as WiFi station
   WiFi.mode(WIFI_STA);
@@ -107,7 +131,6 @@ void setup() {
   esp_now_register_send_cb(data_sent);
   
   // Register peer
-  esp_now_peer_info_t peerInfo;
   memcpy(peerInfo.peer_addr, broadcastAddress, 6);
   peerInfo.channel = 0;  
   peerInfo.encrypt = false;   
@@ -126,12 +149,12 @@ void setup() {
 void loop() {
   getReadings();
  
-  DHT_Readings.temp = temp;
-  DHT_Readings.hum = hum;
+  this_readings.temp = temp;
+  this_readings.hum = hum;
   
-  Serial.println(DHT_Readings.temp);
+  Serial.println(this_readings.temp);
 
-  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &DHT_Readings, sizeof(DHT_Readings));
+  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &this_readings, sizeof(this_readings));
    
   
   Serial.print(WiFi.macAddress());
@@ -157,6 +180,7 @@ TODO:
   Remove placeholding variables outside of structure
   Seperate structure for sending and receiving boards
   Add input for MAC Address
+  Loop search for other device
   Enable Graphing
   More documentation
 */
